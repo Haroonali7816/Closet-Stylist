@@ -1,0 +1,586 @@
+<title>Closet Stylist</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow working column; three numbered steps (you → wardrobe → trip), garments shown as hang tags. */
+:root {
+  --bg: #ECEEF1; --surface: #FFFFFF; --ink: #15181C; --muted: #5B636E; --line: #D2D7DE;
+  --accent: #6E2433; --accent-ink: #FFFFFF; --ok: #2F6B4F; --err: #A3341F;
+  --display: "Bodoni Moda", "Didot", Georgia, serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111316; --surface: #1A1D22; --ink: #ECEEF1; --muted: #9BA4AF; --line: #2D323A;
+  --accent: #E39AA8; --accent-ink: #1C0B10; --ok: #7CC4A0; --err: #F08B75; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111316; --surface: #1A1D22; --ink: #ECEEF1; --muted: #9BA4AF; --line: #2D323A;
+  --accent: #E39AA8; --accent-ink: #1C0B10; --ok: #7CC4A0; --err: #F08B75; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 56px; }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.05; }
+h1 { font-size: clamp(2.6rem, 7vw, 4.4rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.9rem; }
+p { margin: 0; }
+.eyebrow, .lbl, .mono { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mast { display: grid; gap: 12px; }
+.lede { max-width: 60ch; font-size: 1.08rem; color: var(--muted); }
+.banner { border: 1px solid var(--accent); color: var(--ink); padding: 10px 14px; border-radius: 6px; }
+
+section { display: grid; gap: 18px; }
+.sec-head { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: baseline; border-top: 1px solid var(--ink); padding-top: 14px; }
+.step { font-family: var(--display); font-size: 1.9rem; color: var(--accent); grid-row: span 2; }
+.sec-head p { color: var(--muted); max-width: 62ch; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.btn { font: 600 0.92rem var(--body); padding: 10px 16px; border-radius: 999px; border: 1px solid var(--ink);
+  background: transparent; color: var(--ink); cursor: pointer; }
+.btn:hover { background: var(--surface); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.status { min-height: 1.4em; font-size: 0.9rem; color: var(--muted); }
+.status[data-kind="err"] { color: var(--err); }
+.status[data-kind="ok"] { color: var(--ok); }
+.empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 22px; }
+
+textarea, input[type="text"], select { width: 100%; box-sizing: border-box; font: 15px/1.5 var(--body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+textarea { resize: vertical; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.form .wide { grid-column: 1 / -1; }
+.field a { color: var(--accent); }
+
+.strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.self { position: relative; flex: 0 0 auto; }
+.self img { width: 84px; height: 112px; object-fit: cover; border-radius: 4px; display: block; background: var(--line); }
+.x { position: absolute; top: 4px; right: 4px; font: 500 0.7rem var(--mono); border: 0; border-radius: 3px; padding: 2px 6px;
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+.x[data-armed] { background: var(--err); color: #fff; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.tag { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.tag img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: var(--line); }
+.tag-body { padding: 10px; display: grid; gap: 4px; position: relative; }
+.tag-body::before { content: ""; position: absolute; top: -6px; left: 12px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--line); }
+.tag input.name { border: 0; padding: 0; background: transparent; font-weight: 600; border-radius: 0; }
+.warm { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); letter-spacing: 0.1em; }
+.tag .x { position: static; justify-self: start; padding: 0; background: none; color: var(--muted); text-decoration: underline; }
+.tag .x[data-armed] { color: var(--err); background: none; }
+
+.plan { display: grid; gap: 22px; }
+.summary { font-family: var(--display); font-size: 1.3rem; line-height: 1.35; max-width: 60ch; }
+.outfits { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.outfit { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.outfit h3 { margin: 0; font-size: 1rem; }
+.minis { display: flex; flex-wrap: wrap; gap: 8px; }
+.mini { margin: 0; width: 72px; }
+.mini img { width: 72px; height: 96px; object-fit: cover; border-radius: 4px; display: block; background: var(--line); }
+.mini figcaption { font-size: 0.72rem; line-height: 1.25; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+.cols ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.cols li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.cols li img { width: 40px; height: 52px; object-fit: cover; border-radius: 3px; background: var(--line); }
+.cols li small { display: block; color: var(--muted); }
+.check { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: start; }
+.check input:checked ~ span { text-decoration: line-through; color: var(--muted); }
+.agents { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.agents li { display: grid; grid-template-columns: 28px 1fr; gap: 2px 10px; padding: 10px 12px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.agents li::before { content: attr(data-n); grid-row: span 2; font-family: var(--display); font-size: 1.3rem; color: var(--muted); }
+.agents li[data-state="run"] { border-color: var(--accent); }
+.agents li[data-state="run"]::before { color: var(--accent); }
+.agents li[data-state="done"]::before { content: "✓"; color: var(--ok); }
+.agents li[data-state="err"]::before { content: "!"; color: var(--err); }
+.agents small { color: var(--muted); }
+.outfit.best { border: 2px solid var(--accent); }
+.btn.sm { padding: 6px 12px; font-size: 0.82rem; }
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background .15s, filter .15s; } }
+</style>
+
+<main class="wrap">
+  <header class="mast">
+    <p class="eyebrow">Your clothes · your trips</p>
+    <h1>Closet Stylist</h1>
+    <p class="lede">Photograph yourself and every piece you own once. Then say where you're going, the weather and who you're seeing, and it builds the outfits and the packing list from your own wardrobe.</p>
+    <p id="banner" class="banner" hidden></p>
+  </header>
+
+  <section aria-labelledby="h-you">
+    <div class="sec-head"><span class="step">1</span><h2 id="h-you">You</h2>
+      <p>Add 10–30 photos of yourself: front, side, back, close-up of your face in daylight. Claude writes a style profile you can edit.</p></div>
+    <div class="row">
+      <button class="btn" id="selfBtn" type="button">Add photos of me</button>
+      <input class="vh" type="file" id="selfIn" accept="image/*" multiple tabindex="-1">
+      <button class="btn primary" id="readBtn" type="button">Read my style</button>
+    </div>
+    <div id="selfStrip" class="strip"></div>
+    <div class="field">
+      <label class="lbl" for="about">Style profile</label>
+      <textarea id="about" rows="7" placeholder="Filled in from your photos. Add your height, fits you like, anything you never wear."></textarea>
+    </div>
+    <p id="youStatus" class="status" role="status"></p>
+  </section>
+
+  <section aria-labelledby="h-closet">
+    <div class="sec-head"><span class="step">2</span><h2 id="h-closet">Wardrobe</h2>
+      <p>One photo per piece, laid flat or on a hanger: shirts, knitwear, trousers, jackets, coats, shoes, accessories. Each one is tagged automatically; tap a name to fix it.</p></div>
+    <div class="row">
+      <button class="btn" id="itemBtn" type="button">Add clothes</button>
+      <input class="vh" type="file" id="itemIn" accept="image/*" multiple tabindex="-1">
+      <span id="count" class="mono"></span>
+    </div>
+    <p id="closetStatus" class="status" role="status"></p>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <section aria-labelledby="h-dress">
+    <div class="sec-head"><span class="step">3</span><h2 id="h-dress">Dress me</h2>
+      <p>For one day or one event. Three agents work in turn: the Curator pulls what fits the dress code and weather, the Combiner builds outfits from those pieces, and the Judge looks at the photos and scores each one.</p></div>
+    <form id="dressForm" class="form">
+      <div class="field wide"><label class="lbl" for="ask">Where are you going?</label>
+        <textarea id="ask" rows="2" placeholder="University today, seminar meeting. I like to look semi-formal."></textarea></div>
+      <div class="field"><label class="lbl" for="dWeather">Weather</label>
+        <input type="text" id="dWeather" placeholder="e.g. 6 °C, dry, windy"></div>
+      <div class="field" style="align-self:end"><div class="row">
+        <button class="btn primary" id="dressBtn" type="submit">Find my outfit</button>
+        <button class="btn" id="dStop" type="button" hidden>Stop</button></div></div>
+    </form>
+    <ol id="agents" class="agents" hidden>
+      <li id="ag1" data-n="1"><strong>Curator</strong><small>Waiting</small></li>
+      <li id="ag2" data-n="2"><strong>Combiner</strong><small>Waiting</small></li>
+      <li id="ag3" data-n="3"><strong>Judge</strong><small>Waiting</small></li>
+    </ol>
+    <p id="dressStatus" class="status" role="status"></p>
+    <div id="today" class="plan"></div>
+  </section>
+
+  <section aria-labelledby="h-trip">
+    <div class="sec-head"><span class="step">4</span><h2 id="h-trip">Plan a trip</h2>
+      <p>Describe the trip. You get an outfit for each part of it, what to pack, and what to leave at home.</p></div>
+    <form id="tripForm" class="form">
+      <div class="field"><label class="lbl" for="where">Where</label><input type="text" id="where" value="Berlin"></div>
+      <div class="field"><label class="lbl" for="length">How long</label><input type="text" id="length" value="About 65 hours, leaving tomorrow"></div>
+      <div class="field wide"><label class="lbl" for="weather">Weather</label>
+        <input type="text" id="weather" placeholder="e.g. 0–4 °C, grey, light rain on day 2, windy">
+        <small><a href="https://www.yr.no/en/forecast/daily-table/2-2950159/Germany/Berlin/Berlin" target="_blank" rel="noopener">Check the Berlin forecast</a> and paste the highs, lows and rain.</small></div>
+      <div class="field wide"><label class="lbl" for="plans">What you're doing</label>
+        <textarea id="plans" rows="3" placeholder="Dinner, a bar, museums, lots of walking…">Meeting an old friend. I want to look really good, put-together and semi-formal, without looking overdressed.</textarea></div>
+      <div class="field"><label class="lbl" for="bag">Luggage</label>
+        <select id="bag"><option>Carry-on only</option><option>Carry-on + backpack</option><option>Checked suitcase</option></select></div>
+      <div class="field" style="align-self:end"><div class="row">
+        <button class="btn primary" id="planBtn" type="submit">Style me</button>
+        <button class="btn" id="stopBtn" type="button" hidden>Stop</button></div></div>
+    </form>
+    <p id="tripStatus" class="status" role="status"></p>
+    <div id="plan" class="plan"></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const blobUrl = id => "/_blob/" + id;
+const CATS = ["outerwear", "suit", "top", "knit", "bottom", "shoes", "accessory", "other"];
+let db, assets, sample, col, items = [], profile = {}, plan = null, ctl = null, tripLoaded = false;
+
+const say = (sel, msg, kind = "") => { const n = $(sel); n.textContent = msg; n.dataset.kind = kind; };
+const banner = msg => { const b = $("#banner"); b.textContent = msg; b.hidden = !msg; };
+function errCopy(e) {
+  const map = {
+    not_granted: "Claude access was declined for this page. Reload the page to be asked again.",
+    rate_limited: "Too many requests right now. Wait a minute, then try again.",
+    image_rejected: "A photo couldn't be read. Use JPEG or PNG.",
+    refused: "Claude declined that request. Reword it and try again.",
+    invalid_json: "The answer came back incomplete. Try again.",
+    quota_or_state: "Photo storage is full. Remove some photos first.",
+    too_large: "That photo is too large.",
+    session_expired: "Sign in to claude.ai again, then reload.",
+    cancelled: "Stopped.",
+  };
+  return map[e?.code] || "Something went wrong" + (e?.code ? ` (${e.code})` : "") + ". Try again.";
+}
+
+// Shrinks a phone photo to ≤1400px JPEG so storage and uploads stay small.
+async function shrink(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const s = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("encode")), "image/jpeg", 0.85));
+}
+
+// Two clicks to delete: first arms the button, second confirms.
+function armed(btn) {
+  if (btn.dataset.armed) return true;
+  btn.dataset.armed = "1"; const old = btn.textContent; btn.textContent = "Sure?";
+  setTimeout(() => { delete btn.dataset.armed; btn.textContent = old; }, 3000);
+  return false;
+}
+
+async function saveProfile(patch) { profile = { ...profile, ...patch }; await col.doc("profile").set(profile); }
+
+/* ---------- 1. You ---------- */
+async function addSelf(files) {
+  const ids = [...(profile.photos || [])]; let failed = 0;
+  for (const [i, f] of files.entries()) {
+    say("#youStatus", `Uploading ${i + 1} of ${files.length}…`);
+    try { ids.push((await assets.upload(await shrink(f))).id); }
+    catch (e) { failed++; }
+  }
+  await saveProfile({ photos: ids });
+  say("#youStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `${ids.length} photos of you saved.`, failed ? "err" : "ok");
+}
+
+const STYLE_PROMPT = `These are photos of me from different angles. Act as a frank, experienced personal stylist.
+Write a compact style profile I can reuse for outfit planning. Plain text, short labelled lines, no markdown, under 180 words. Cover:
+build and proportions; skin, hair and eye colouring and which colours flatter me vs wash me out; fits and silhouettes that work vs don't; collars, trouser rise and lengths to prefer; two things to avoid.
+If notes from me follow, keep every fact in them.`;
+
+async function readStyle() {
+  const caps = await sample.limits().catch(() => null);
+  const max = caps?.images?.maxCount || 0;
+  if (!max) return say("#youStatus", "This view can't send photos to Claude. Open the page on claude.ai.", "err");
+  const ids = (profile.photos || []).slice(-max);
+  if (!ids.length) return say("#youStatus", "Add a few photos of yourself first.", "err");
+  $("#readBtn").disabled = true; say("#youStatus", "Looking at your photos… (about a minute)");
+  try {
+    const blobs = await Promise.all(ids.map(id => fetch(blobUrl(id)).then(r => r.blob())));
+    const notes = $("#about").value.trim();
+    const { text } = await sample(STYLE_PROMPT + (notes ? "\n\nMy notes:\n" + notes : ""), {
+      images: blobs, cache: false, onText: ({ text }) => { $("#about").value = text; } });
+    await saveProfile({ about: text });
+    say("#youStatus", `Profile written from ${ids.length} photos. Edit it freely.`, "ok");
+  } catch (e) { say("#youStatus", errCopy(e), "err"); }
+  finally { $("#readBtn").disabled = false; }
+}
+
+/* ---------- 2. Wardrobe ---------- */
+const TAG_PROMPT = `This photo shows one clothing item, pair of shoes or accessory. Reply with only JSON:
+{"name":"navy wool overcoat","cat":"outerwear|suit|top|knit|bottom|shoes|accessory|other","color":"navy","warmth":1-5,"formality":"casual|smart casual|semi-formal|formal","notes":"fabric, fit, notable details, under 12 words"}`;
+
+function cleanTag(t) {
+  return {
+    name: String(t?.name || "Untitled item").slice(0, 60),
+    cat: CATS.includes(t?.cat) ? t.cat : "other",
+    color: String(t?.color || "").slice(0, 30),
+    warmth: Math.min(5, Math.max(1, Math.round(Number(t?.warmth) || 3))),
+    formality: String(t?.formality || "").slice(0, 20),
+    notes: String(t?.notes || "").slice(0, 120),
+  };
+}
+
+async function addItems(files) {
+  let failed = 0;
+  for (const [i, f] of files.entries()) {
+    say("#closetStatus", `Adding ${i + 1} of ${files.length}…`);
+    let blob, ref;
+    try {
+      blob = await shrink(f);
+      const up = await assets.upload(blob);
+      ref = col.doc("item-" + up.id);
+      await ref.set({ asset: up.id, name: "Tagging…", cat: "other", added: Date.now() });
+    } catch (e) { failed++; continue; }
+    if (!sample) { await ref.update({ name: "Untitled item" }); continue; }
+    try { await ref.update(cleanTag(await sample.json(TAG_PROMPT, { images: [blob], modelTier: "quick" }))); }
+    catch (e) {
+      await ref.update({ name: "Untitled item" });
+      if (["not_granted", "rate_limited", "sampling_disabled"].includes(e?.code)) say("#closetStatus", errCopy(e), "err");
+    }
+  }
+  say("#closetStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `Added ${files.length}. Check the names and fix any that are off.`, failed ? "err" : "ok");
+}
+
+async function removeItem(id) {
+  const it = items.find(x => x.id === id); if (!it) return;
+  await col.doc(id).delete();
+  await assets.delete(it.asset).catch(() => {});
+}
+
+/* ---------- feedback the agents learn from ---------- */
+const feedbackText = () => {
+  const f = profile.feedback || [];
+  return f.length ? "\n\nMy past feedback on outfits (respect it):\n" +
+    f.slice(-15).map(x => `- ${x.verdict}: ${x.items.join(" + ")} (for: ${x.ask})`).join("\n") : "";
+};
+
+/* ---------- 3. Dress me: Curator → Combiner → Judge ---------- */
+let today = null;
+function setAgent(n, state, text) { const li = $("#ag" + n); li.dataset.state = state; li.querySelector("small").textContent = text; }
+
+async function dressMe(ev) {
+  ev.preventDefault();
+  const list = items.filter(i => i.name !== "Tagging…");
+  if (list.length < 3) return say("#dressStatus", "Add at least a few clothes in step 2 first.", "err");
+  const ask = $("#ask").value.trim();
+  if (!ask) return say("#dressStatus", "Say where you're going first.", "err");
+  const weather = $("#dWeather").value.trim() || `unknown; assume typical for ${new Date().toDateString()}`;
+  const ctx = `About me:\n${$("#about").value.trim() || "(no profile yet)"}\n\nToday: ${ask}\nWeather: ${weather}${feedbackText()}`;
+  const lines = catalog(list).split("\n");
+  const refOf = it => "i" + (list.indexOf(it) + 1);
+  ctl = new AbortController(); const signal = ctl.signal;
+  $("#dressBtn").disabled = true; $("#dStop").hidden = false; $("#agents").hidden = false;
+  [1, 2, 3].forEach(n => setAgent(n, "wait", "Waiting"));
+  say("#dressStatus", "");
+  let stage = 1;
+  try {
+    // Agent 1, Curator: narrow the wardrobe to what fits the dress code and weather.
+    setAgent(1, "run", "Going through your wardrobe…");
+    const c = await sample.json(`You are the CURATOR on a styling team. From my wardrobe, keep every item that could suit today's occasion, dress code and weather, and drop the rest. Keep enough tops, bottoms, shoes, layers and accessories for several different outfits.
+
+${ctx}
+
+Wardrobe (ref | category | name | colour | warmth | formality | notes):
+${lines.join("\n")}
+
+Reply with only JSON: {"keep":["i1","i4"],"note":"one sentence on what you kept and dropped"}`, { signal, modelTier: "quick", cache: false });
+    const kept = [...new Set((c.keep || []).map(r => resolveRef(r, list)).filter(Boolean))];
+    if (kept.length < 2) throw { code: "few_items" };
+    setAgent(1, "done", `Kept ${kept.length} of ${list.length}. ${c.note || ""}`);
+
+    // Agent 2, Combiner: build distinct complete outfits from the kept pieces only.
+    stage = 2; setAgent(2, "run", "Trying combinations…");
+    const k = await sample.json(`You are the COMBINER on a styling team. Build 6 distinct, complete outfits using ONLY these items: a top and bottom (or a suit), shoes, plus an outer layer, knit or accessories when the weather or occasion calls for it. Vary the colour stories and the level of formality within the dress code.
+
+${ctx}
+
+Items (ref | category | name | colour | warmth | formality | notes):
+${lines.filter((_, i) => kept.includes(list[i])).join("\n")}
+
+Reply with only JSON: {"outfits":[{"name":"Navy and grey, quietly smart","items":["i3","i7","i12"],"idea":"one sentence"}]}`, { signal, cache: false });
+    const outfits = (k.outfits || []).map(o => ({ name: String(o.name || "Outfit"), idea: String(o.idea || ""),
+      items: [...new Set((o.items || []).map(r => resolveRef(r, list)).filter(Boolean))] })).filter(o => o.items.length >= 2).slice(0, 8);
+    if (!outfits.length) throw { code: "few_items" };
+    setAgent(2, "done", `${outfits.length} combinations built.`);
+
+    // Agent 3, Judge: look at the actual photos, score every outfit, pick one.
+    stage = 3; setAgent(3, "run", "Looking at the photos and scoring…");
+    const max = (await sample.limits().catch(() => null))?.images?.maxCount || 0;
+    const pics = [...new Set(outfits.flatMap(o => o.items))].slice(0, max);
+    const blobs = await Promise.all(pics.map(it => fetch(blobUrl(it.asset)).then(r => r.blob())));
+    const j = await sample.json(`You are the JUDGE on a styling team: a strict, honest stylist. Score each outfit from 1 to 10 on: weather (warm/dry enough), occasion (right dress code), colour (palette works together), suits (flatters me, per my profile). Then pick the single best one.
+
+${ctx}
+
+Outfits:
+${outfits.map((o, n) => `${n + 1}. ${o.name}: ${o.items.map(it => `${refOf(it)} ${it.name}`).join(" + ")}`).join("\n")}
+${pics.length ? `\nPhotos attached, in this order: ${pics.map(refOf).join(", ")}. Trust the photos over the text where they differ.` : ""}
+
+Reply with only JSON: {"scores":[{"n":1,"weather":8,"occasion":9,"colour":7,"suits":8,"note":"short verdict"}],"winner":1,"why":"two sentences","tweak":"one small styling tip for the winner"}`,
+      { signal, cache: false, ...(blobs.length ? { images: blobs } : {}) });
+    const scored = outfits.map((o, n) => {
+      const s = (j.scores || []).find(x => +x.n === n + 1) || {};
+      const nums = ["weather", "occasion", "colour", "suits"].map(f => Math.max(0, Math.min(10, Math.round(+s[f] || 0))));
+      return { name: o.name, idea: o.idea, note: String(s.note || ""), items: o.items.map(it => it.id), scores: nums, total: nums.reduce((a, b) => a + b, 0) };
+    });
+    const best = scored.reduce((b, o, n) => o.total > scored[b].total ? n : b, 0);
+    const winner = +j.winner >= 1 && +j.winner <= scored.length ? +j.winner - 1 : best;
+    setAgent(3, "done", `Picked "${scored[winner].name}".`);
+    await col.doc("today").set({ ask, weather: $("#dWeather").value.trim(), outfits: scored, winner,
+      why: String(j.why || ""), tweak: String(j.tweak || ""), at: Date.now() });
+  } catch (e) {
+    setAgent(stage, "err", e?.code === "cancelled" ? "Stopped." : "Failed.");
+    say("#dressStatus", e?.code === "few_items" ? "Too few of your clothes fit that request. Add more pieces or loosen it." : errCopy(e), e?.code === "cancelled" ? "" : "err");
+  } finally { $("#dressBtn").disabled = false; $("#dStop").hidden = true; }
+}
+
+function renderToday() {
+  const el = $("#today");
+  if (!today?.outfits?.length) { el.innerHTML = `<p class="empty">Your best outfit appears here, with the runners-up and their scores.</p>`; return; }
+  const byId = Object.fromEntries(items.map(i => [i.id, i]));
+  const minis = ids => ids.map(id => byId[id]).filter(Boolean).map(it =>
+    `<figure class="mini"><img src="${blobUrl(it.asset)}" alt=""><figcaption>${esc(it.name)}</figcaption></figure>`).join("");
+  const score = o => `<p class="mono">Weather ${o.scores[0]} · Occasion ${o.scores[1]} · Colour ${o.scores[2]} · Suits you ${o.scores[3]} · ${o.total}/40</p>`;
+  const fb = n => {
+    const done = (profile.feedback || []).find(x => x.src === `${today.at}:${n}`);
+    return done ? `<p class="status" data-kind="ok">You said: ${done.verdict === "liked" ? "liked it" : "not me"}. The agents will remember.</p>`
+      : `<div class="row"><button class="btn sm" type="button" data-fb="liked" data-k="${n}">Liked it</button><button class="btn sm" type="button" data-fb="disliked" data-k="${n}">Not me</button></div>`;
+  };
+  const w = today.outfits[today.winner] || today.outfits[0];
+  const rest = today.outfits.map((o, n) => [o, n]).filter(([, n]) => n !== today.winner).sort((a, b) => b[0].total - a[0].total);
+  const when = new Date(today.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  el.innerHTML = `<p class="mono">${esc(today.ask)} · picked ${esc(when)}</p>
+    <div class="outfit best"><p class="lbl">Wear this</p><h3>${esc(w.name)}</h3><div class="minis">${minis(w.items)}</div>${score(w)}
+      <p>${esc(today.why)}</p>${today.tweak ? `<p><strong>Tip:</strong> ${esc(today.tweak)}</p>` : ""}${fb(today.winner)}</div>
+    ${rest.length ? `<p class="lbl">Runners-up</p><div class="outfits">${rest.map(([o, n]) => `<div class="outfit"><h3>${esc(o.name)}</h3>
+      <div class="minis">${minis(o.items)}</div>${score(o)}<p>${esc(o.note || o.idea)}</p>${fb(n)}</div>`).join("")}</div>` : ""}`;
+}
+
+/* ---------- 4. Trip ---------- */
+const catalog = list => list.map((it, i) =>
+  `i${i + 1} | ${it.cat} | ${it.name} | ${it.color || "-"} | warmth ${it.warmth || "?"}/5 | ${it.formality || "-"} | ${it.notes || ""}`).join("\n");
+const resolveRef = (ref, list) => { const m = /^i(\d+)$/.exec(String(ref).trim()); return m ? list[+m[1] - 1] : undefined; };
+console.assert(resolveRef("i2", [{ a: 1 }, { b: 2 }])?.b === 2 && !resolveRef("x", []) && !resolveRef("i9", []), "resolveRef self-check");
+
+function tripFromForm() {
+  return { where: $("#where").value.trim(), length: $("#length").value.trim(), weather: $("#weather").value.trim(),
+           plans: $("#plans").value.trim(), bag: $("#bag").value };
+}
+
+async function makePlan(ev) {
+  ev.preventDefault();
+  const list = items.filter(i => i.name !== "Tagging…");
+  if (!list.length) return say("#tripStatus", "Add some clothes in step 2 first.", "err");
+  const trip = tripFromForm();
+  if (!trip.weather) say("#tripStatus", "No weather given, so assuming typical weather for the place and season.");
+  const prompt = `You are my personal stylist. Plan what I wear and pack using ONLY items from my wardrobe list.
+
+About me:
+${$("#about").value.trim() || "(no profile yet)"}${feedbackText()}
+
+Trip:
+- Where: ${trip.where}
+- How long: ${trip.length}
+- Weather: ${trip.weather || "unknown; assume typical for the place and time of year (today is " + new Date().toDateString() + ")"}
+- What I'm doing: ${trip.plans}
+- Luggage: ${trip.bag}
+
+My wardrobe (ref | category | name | colour | warmth | formality | notes):
+${catalog(list)}
+
+Rules: one outfit per real part of the trip (travel there, each day, each evening plan, travel back). Re-wear pieces sensibly to pack light for the luggage given. Layer for the weather. Favour colours and fits that suit me. Outfits must be coherent in colour and formality. If something essential is missing (e.g. no warm coat), say so in "missing".
+Reply with only JSON:
+{"summary":"two sentences","outfits":[{"when":"Day 1 · travel & dinner","items":["i3","i7"],"why":"one sentence"}],"pack":[{"ref":"i3","why":"few words"}],"leave":[{"ref":"i9","why":"few words"}],"missing":["short"],"tips":["short"]}
+"pack" lists every item to bring, including what I wear while travelling. "leave" lists at most 8 items I might be tempted to bring but shouldn't.`;
+
+  ctl = new AbortController();
+  $("#planBtn").disabled = true; $("#stopBtn").hidden = false;
+  say("#tripStatus", "Thinking through your outfits… (up to a minute or two)");
+  try {
+    const r = await sample.json(prompt, { signal: ctl.signal, cache: false });
+    const id = ref => resolveRef(ref, list)?.id;
+    const result = {
+      summary: String(r.summary || ""),
+      outfits: (r.outfits || []).map(o => ({ when: String(o.when || ""), why: String(o.why || ""), items: (o.items || []).map(id).filter(Boolean) })),
+      pack: (r.pack || []).map(p => ({ id: id(p.ref), why: String(p.why || "") })).filter(p => p.id),
+      leave: (r.leave || []).map(p => ({ id: id(p.ref), why: String(p.why || "") })).filter(p => p.id),
+      missing: (r.missing || []).map(String), tips: (r.tips || []).map(String),
+    };
+    await col.doc("plan").set({ trip, result, at: Date.now() });
+    say("#tripStatus", "Done. Saved, so it's here next time you open the page.", "ok");
+  } catch (e) { say("#tripStatus", errCopy(e), e?.code === "cancelled" ? "" : "err"); }
+  finally { $("#planBtn").disabled = false; $("#stopBtn").hidden = true; }
+}
+
+/* ---------- render ---------- */
+function render() {
+  // Self photos
+  const ph = profile.photos || [];
+  $("#selfStrip").innerHTML = ph.map(id => `<div class="self"><img src="${blobUrl(id)}" alt="Photo of you" loading="lazy">
+    ${assets ? `<button class="x" data-self="${esc(id)}" type="button" aria-label="Remove photo">✕</button>` : ""}</div>`).join("")
+    || `<p class="empty">No photos of you yet.</p>`;
+  if (document.activeElement !== $("#about") && profile.about !== undefined) $("#about").value = profile.about;
+
+  // Wardrobe
+  const sorted = [...items].sort((a, b) => CATS.indexOf(a.cat) - CATS.indexOf(b.cat) || (a.added || 0) - (b.added || 0));
+  $("#count").textContent = items.length ? `${items.length} pieces` : "";
+  $("#grid").innerHTML = sorted.map(it => `<article class="tag">
+      <img src="${blobUrl(it.asset)}" alt="${esc(it.name)}" loading="lazy">
+      <div class="tag-body">
+        <input class="name" type="text" id="n-${esc(it.id)}" data-item="${esc(it.id)}" value="${esc(it.name)}" aria-label="Item name">
+        <p class="mono">${esc([it.cat, it.color, it.formality].filter(Boolean).join(" · "))}</p>
+        ${it.warmth ? `<p class="warm" title="Warmth ${it.warmth} of 5">${"●".repeat(it.warmth)}${"○".repeat(5 - it.warmth)}</p>` : ""}
+        ${assets ? `<button class="x" data-del="${esc(it.id)}" type="button">Remove</button>` : ""}
+      </div></article>`).join("")
+    || `<p class="empty">Your wardrobe is empty. Add photos of your clothes and shoes to start.</p>`;
+
+  // Trip form: restore last trip once
+  if (plan?.trip && !tripLoaded) {
+    tripLoaded = true;
+    for (const k of ["where", "length", "weather", "plans", "bag"]) if (plan.trip[k]) $("#" + k).value = plan.trip[k];
+  }
+  renderToday();
+  renderPlan();
+}
+
+function renderPlan() {
+  const el = $("#plan");
+  if (!plan?.result) { el.innerHTML = `<p class="empty">Your outfits, packing list and what to leave at home appear here.</p>`; return; }
+  const byId = Object.fromEntries(items.map(i => [i.id, i]));
+  const R = plan.result;
+  const mini = id => { const it = byId[id]; return it ? `<figure class="mini"><img src="${blobUrl(it.asset)}" alt=""><figcaption>${esc(it.name)}</figcaption></figure>` : ""; };
+  const line = (p, check) => { const it = byId[p.id]; if (!it) return "";
+    const body = `<img src="${blobUrl(it.asset)}" alt=""><span>${esc(it.name)}<small>${esc(p.why)}</small></span>`;
+    return check ? `<li><label class="check"><input type="checkbox" id="pk-${esc(p.id)}">${body}</label></li>` : `<li>${body}</li>`; };
+  const when = new Date(plan.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  el.innerHTML = `
+    <p class="mono">${esc(plan.trip.where)} · ${esc(plan.trip.length)} · planned ${esc(when)}</p>
+    ${R.summary ? `<p class="summary">${esc(R.summary)}</p>` : ""}
+    <div class="outfits">${R.outfits.map(o => `<div class="outfit"><h3>${esc(o.when)}</h3>
+      <div class="minis">${o.items.map(mini).join("")}</div><p>${esc(o.why)}</p></div>`).join("")}</div>
+    <div class="cols">
+      <div><p class="lbl">Pack · ${R.pack.length} pieces</p><ul>${R.pack.map(p => line(p, true)).join("")}</ul></div>
+      <div><p class="lbl">Leave at home</p><ul>${R.leave.map(p => line(p)).join("") || "<li>Nothing flagged.</li>"}</ul></div>
+      ${R.missing.length || R.tips.length ? `<div>
+        ${R.missing.length ? `<p class="lbl">Missing from your wardrobe</p><ul>${R.missing.map(m => `<li><span>${esc(m)}</span></li>`).join("")}</ul>` : ""}
+        ${R.tips.length ? `<p class="lbl" style="margin-top:16px">Tips</p><ul>${R.tips.map(m => `<li><span>${esc(m)}</span></li>`).join("")}</ul>` : ""}
+      </div>` : ""}
+    </div>`;
+}
+
+/* ---------- wiring ---------- */
+$("#selfBtn").onclick = () => $("#selfIn").click();
+$("#itemBtn").onclick = () => $("#itemIn").click();
+$("#selfIn").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) addSelf(f); };
+$("#itemIn").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) addItems(f); };
+$("#readBtn").onclick = readStyle;
+$("#tripForm").onsubmit = makePlan;
+$("#dressForm").onsubmit = dressMe;
+$("#stopBtn").onclick = () => ctl?.abort();
+$("#dStop").onclick = () => ctl?.abort();
+$("#about").addEventListener("change", () => col && saveProfile({ about: $("#about").value }));
+document.addEventListener("change", e => {
+  const id = e.target.dataset?.item;
+  if (id && col) col.doc(id).update({ name: e.target.value.trim().slice(0, 60) || "Untitled item" });
+});
+document.addEventListener("click", async e => {
+  const f = e.target.closest("button[data-fb]");
+  if (f && today && col) {
+    const n = +f.dataset.k, o = today.outfits[n]; f.parentElement.querySelectorAll("button").forEach(x => x.disabled = true);
+    const names = o.items.map(id => items.find(i => i.id === id)?.name).filter(Boolean);
+    await saveProfile({ feedback: [...(profile.feedback || []), { verdict: f.dataset.fb, items: names, ask: today.ask, src: `${today.at}:${n}`, at: Date.now() }].slice(-40) });
+    return;
+  }
+  const b =e.target.closest("button[data-del], button[data-self]"); if (!b || !armed(b)) return;
+  if (b.dataset.del) await removeItem(b.dataset.del);
+  else { const id = b.dataset.self; await saveProfile({ photos: (profile.photos || []).filter(x => x !== id) }); assets.delete(id).catch(() => {}); }
+});
+
+render();
+(async () => {
+  if (!window.claude?.use) { banner("Open this page on claude.ai, signed in, to save your wardrobe."); return; }
+  let user;
+  [db, assets, sample, user] = await Promise.all(["db", "assets", "sample", "user"].map(n => claude.use(n)));
+  const uid = await user?.id();
+  if (!db || !uid) { banner("Sign in to claude.ai to save your wardrobe."); return; }
+  const notes = [];
+  if (!assets) notes.push("Only the page's owner can add photos.");
+  if (!sample) notes.push("Claude isn't available in this view, so tagging and styling are off.");
+  banner(notes.join(" "));
+  for (const id of ["selfBtn", "itemBtn"]) $("#" + id).disabled = !assets;
+  for (const id of ["readBtn", "planBtn", "dressBtn"]) $("#" + id).disabled = !sample;
+  col = db.collection("data/users/" + uid);
+  const t = setTimeout(() => banner("Can't reach your saved wardrobe yet. Check your connection."), 10000);
+  col.onSnapshot(snap => {
+    if (!snap.metadata.fromCache) { clearTimeout(t); if ($("#banner").textContent.startsWith("Can't reach")) banner(notes.join(" ")); }
+    items = []; profile = {}; plan = null; today = null;
+    for (const d of snap.docs) {
+      const v = d.data();
+      if (d.id === "profile") profile = { ...v };
+      else if (d.id === "plan") plan = v;
+      else if (d.id === "today") today = v;
+      else if (d.id.startsWith("item-")) items.push({ id: d.id, ...v });
+    }
+    render();
+  }, e => { clearTimeout(t); banner(`Your wardrobe couldn't load (${e.code}). Reload the page.`); });
+})();
+</script>

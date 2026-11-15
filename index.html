@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Closet Stylist</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow working column; three numbered steps (you → wardrobe → trip), garments shown as hang tags. */
+:root {
+  --bg: #ECEEF1; --surface: #FFFFFF; --ink: #15181C; --muted: #5B636E; --line: #D2D7DE;
+  --accent: #6E2433; --accent-ink: #FFFFFF; --ok: #2F6B4F; --err: #A3341F;
+  --display: "Bodoni Moda", "Didot", Georgia, serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111316; --surface: #1A1D22; --ink: #ECEEF1; --muted: #9BA4AF; --line: #2D323A;
+  --accent: #E39AA8; --accent-ink: #1C0B10; --ok: #7CC4A0; --err: #F08B75; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111316; --surface: #1A1D22; --ink: #ECEEF1; --muted: #9BA4AF; --line: #2D323A;
+  --accent: #E39AA8; --accent-ink: #1C0B10; --ok: #7CC4A0; --err: #F08B75; color-scheme: dark }
+
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 56px; }
+h1, h2 { font-family: var(--display); font-weight: 700; margin: 0; text-wrap: balance; line-height: 1.05; }
+h1 { font-size: clamp(2.6rem, 7vw, 4.4rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.9rem; }
+p { margin: 0; }
+.eyebrow, .lbl, .mono { font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mast { display: grid; gap: 12px; }
+.lede { max-width: 60ch; font-size: 1.08rem; color: var(--muted); }
+.settings { display: grid; gap: 8px; }
+.settings[open] { gap: 10px; }
+.settings summary { cursor: pointer; }
+.settings small { color: var(--muted); }
+.banner { border: 1px solid var(--accent); color: var(--ink); padding: 10px 14px; border-radius: 6px; }
+
+section { display: grid; gap: 18px; }
+.sec-head { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: baseline; border-top: 1px solid var(--ink); padding-top: 14px; }
+.step { font-family: var(--display); font-size: 1.9rem; color: var(--accent); grid-row: span 2; }
+.sec-head p { color: var(--muted); max-width: 62ch; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.btn { font: 600 0.92rem var(--body); padding: 10px 16px; border-radius: 999px; border: 1px solid var(--ink);
+  background: transparent; color: var(--ink); cursor: pointer; }
+.btn:hover { background: var(--surface); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: default; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.status { min-height: 1.4em; font-size: 0.9rem; color: var(--muted); }
+.status[data-kind="err"] { color: var(--err); }
+.status[data-kind="ok"] { color: var(--ok); }
+.empty { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 22px; }
+
+textarea, input[type="text"], select { width: 100%; box-sizing: border-box; font: 15px/1.5 var(--body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+textarea { resize: vertical; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.form .wide { grid-column: 1 / -1; }
+.field a { color: var(--accent); }
+
+.strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.self { position: relative; flex: 0 0 auto; }
+.self img { width: 84px; height: 112px; object-fit: cover; border-radius: 4px; display: block; background: var(--line); }
+.x { position: absolute; top: 4px; right: 4px; font: 500 0.7rem var(--mono); border: 0; border-radius: 3px; padding: 2px 6px;
+  background: var(--surface); color: var(--ink); cursor: pointer; }
+.x[data-armed] { background: var(--err); color: #fff; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.tag { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.tag img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: var(--line); }
+.tag-body { padding: 10px; display: grid; gap: 4px; position: relative; }
+.tag-body::before { content: ""; position: absolute; top: -6px; left: 12px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--bg); border: 1px solid var(--line); }
+.tag input.name { border: 0; padding: 0; background: transparent; font-weight: 600; border-radius: 0; }
+.warm { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); letter-spacing: 0.1em; }
+.tag .x { position: static; justify-self: start; padding: 0; background: none; color: var(--muted); text-decoration: underline; }
+.tag .x[data-armed] { color: var(--err); background: none; }
+
+.plan { display: grid; gap: 22px; }
+.summary { font-family: var(--display); font-size: 1.3rem; line-height: 1.35; max-width: 60ch; }
+.outfits { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.outfit { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.outfit h3 { margin: 0; font-size: 1rem; }
+.minis { display: flex; flex-wrap: wrap; gap: 8px; }
+.mini { margin: 0; width: 72px; }
+.mini img { width: 72px; height: 96px; object-fit: cover; border-radius: 4px; display: block; background: var(--line); }
+.mini figcaption { font-size: 0.72rem; line-height: 1.25; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+.cols ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.cols li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
+.cols li img { width: 40px; height: 52px; object-fit: cover; border-radius: 3px; background: var(--line); }
+.cols li small { display: block; color: var(--muted); }
+.check { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: start; }
+.check input:checked ~ span { text-decoration: line-through; color: var(--muted); }
+.agents { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.agents li { display: grid; grid-template-columns: 28px 1fr; gap: 2px 10px; padding: 10px 12px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.agents li::before { content: attr(data-n); grid-row: span 2; font-family: var(--display); font-size: 1.3rem; color: var(--muted); }
+.agents li[data-state="run"] { border-color: var(--accent); }
+.agents li[data-state="run"]::before { color: var(--accent); }
+.agents li[data-state="done"]::before { content: "✓"; color: var(--ok); }
+.agents li[data-state="err"]::before { content: "!"; color: var(--err); }
+.agents small { color: var(--muted); }
+.outfit.best { border: 2px solid var(--accent); }
+.btn.sm { padding: 6px 12px; font-size: 0.82rem; }
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background .15s, filter .15s; } }
+</style>
+
+</head>
+<body>
+<main class="wrap">
+  <header class="mast">
+    <p class="eyebrow">Your clothes · your trips</p>
+    <h1>Closet Stylist</h1>
+    <p class="lede">Photograph yourself and every piece you own once. Then say where you're going, the weather and who you're seeing, and it builds the outfits and the packing list from your own wardrobe.</p>
+    <details id="settings" class="settings">
+      <summary class="lbl">Settings · Anthropic API key</summary>
+      <div class="row">
+        <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off" aria-label="Anthropic API key" style="flex:1;min-width:0">
+        <button class="btn" id="saveKey" type="button">Save key</button>
+      </div>
+      <small>Get a key at console.anthropic.com. It's stored only in this browser and sent only to api.anthropic.com. Your photos and wardrobe stay in this browser too.</small>
+    </details>
+    <p id="banner" class="banner" hidden></p>
+  </header>
+
+  <section aria-labelledby="h-you">
+    <div class="sec-head"><span class="step">1</span><h2 id="h-you">You</h2>
+      <p>Add 10–30 photos of yourself: front, side, back, close-up of your face in daylight. Claude writes a style profile you can edit.</p></div>
+    <div class="row">
+      <button class="btn" id="selfBtn" type="button">Add photos of me</button>
+      <input class="vh" type="file" id="selfIn" accept="image/*" multiple tabindex="-1">
+      <button class="btn primary" id="readBtn" type="button">Read my style</button>
+    </div>
+    <div id="selfStrip" class="strip"></div>
+    <div class="field">
+      <label class="lbl" for="about">Style profile</label>
+      <textarea id="about" rows="7" placeholder="Filled in from your photos. Add your height, fits you like, anything you never wear."></textarea>
+    </div>
+    <p id="youStatus" class="status" role="status"></p>
+  </section>
+
+  <section aria-labelledby="h-closet">
+    <div class="sec-head"><span class="step">2</span><h2 id="h-closet">Wardrobe</h2>
+      <p>One photo per piece, laid flat or on a hanger: shirts, knitwear, trousers, jackets, coats, shoes, accessories. Each one is tagged automatically; tap a name to fix it.</p></div>
+    <div class="row">
+      <button class="btn" id="itemBtn" type="button">Add clothes</button>
+      <input class="vh" type="file" id="itemIn" accept="image/*" multiple tabindex="-1">
+      <span id="count" class="mono"></span>
+    </div>
+    <p id="closetStatus" class="status" role="status"></p>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <section aria-labelledby="h-dress">
+    <div class="sec-head"><span class="step">3</span><h2 id="h-dress">Dress me</h2>
+      <p>For one day or one event. Three agents work in turn: the Curator pulls what fits the dress code and weather, the Combiner builds outfits from those pieces, and the Judge looks at the photos and scores each one.</p></div>
+    <form id="dressForm" class="form">
+      <div class="field wide"><label class="lbl" for="ask">Where are you going?</label>
+        <textarea id="ask" rows="2" placeholder="University today, seminar meeting. I like to look semi-formal."></textarea></div>
+      <div class="field"><label class="lbl" for="dWeather">Weather</label>
+        <input type="text" id="dWeather" placeholder="e.g. 6 °C, dry, windy"></div>
+      <div class="field" style="align-self:end"><div class="row">
+        <button class="btn primary" id="dressBtn" type="submit">Find my outfit</button>
+        <button class="btn" id="dStop" type="button" hidden>Stop</button></div></div>
+    </form>
+    <ol id="agents" class="agents" hidden>
+      <li id="ag1" data-n="1"><strong>Curator</strong><small>Waiting</small></li>
+      <li id="ag2" data-n="2"><strong>Combiner</strong><small>Waiting</small></li>
+      <li id="ag3" data-n="3"><strong>Judge</strong><small>Waiting</small></li>
+    </ol>
+    <p id="dressStatus" class="status" role="status"></p>
+    <div id="today" class="plan"></div>
+  </section>
+
+  <section aria-labelledby="h-trip">
+    <div class="sec-head"><span class="step">4</span><h2 id="h-trip">Plan a trip</h2>
+      <p>Describe the trip. You get an outfit for each part of it, what to pack, and what to leave at home.</p></div>
+    <form id="tripForm" class="form">
+      <div class="field"><label class="lbl" for="where">Where</label><input type="text" id="where" value="Berlin"></div>
+      <div class="field"><label class="lbl" for="length">How long</label><input type="text" id="length" value="About 65 hours, leaving tomorrow"></div>
+      <div class="field wide"><label class="lbl" for="weather">Weather</label>
+        <input type="text" id="weather" placeholder="e.g. 0–4 °C, grey, light rain on day 2, windy">
+        <small><a href="https://www.yr.no/en/forecast/daily-table/2-2950159/Germany/Berlin/Berlin" target="_blank" rel="noopener">Check the Berlin forecast</a> and paste the highs, lows and rain.</small></div>
+      <div class="field wide"><label class="lbl" for="plans">What you're doing</label>
+        <textarea id="plans" rows="3" placeholder="Dinner, a bar, museums, lots of walking…">Meeting an old friend. I want to look really good, put-together and semi-formal, without looking overdressed.</textarea></div>
+      <div class="field"><label class="lbl" for="bag">Luggage</label>
+        <select id="bag"><option>Carry-on only</option><option>Carry-on + backpack</option><option>Checked suitcase</option></select></div>
+      <div class="field" style="align-self:end"><div class="row">
+        <button class="btn primary" id="planBtn" type="submit">Style me</button>
+        <button class="btn" id="stopBtn" type="button" hidden>Stop</button></div></div>
+    </form>
+    <p id="tripStatus" class="status" role="status"></p>
+    <div id="plan" class="plan"></div>
+  </section>
+</main>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
