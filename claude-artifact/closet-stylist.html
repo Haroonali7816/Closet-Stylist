@@ -191,6 +191,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const blobUrl = id => "/_blob/" + id;
 const CATS = ["outerwear", "suit", "top", "knit", "bottom", "shoes", "accessory", "other"];
 let db, assets, sample, col, items = [], profile = {}, plan = null, ctl = null, tripLoaded = false;
+const tagging = new Set(); // item ids being tagged by an upload in this tab
 
 const say = (sel, msg, kind = "") => { const n = $(sel); n.textContent = msg; n.dataset.kind = kind; };
 const banner = msg => { const b = $("#banner"); b.textContent = msg; b.hidden = !msg; };
@@ -231,14 +232,16 @@ async function saveProfile(patch) { profile = { ...profile, ...patch }; await co
 
 /* ---------- 1. You ---------- */
 async function addSelf(files) {
-  const ids = [...(profile.photos || [])]; let failed = 0;
+  let failed = 0;
   for (const [i, f] of files.entries()) {
     say("#youStatus", `Uploading ${i + 1} of ${files.length}…`);
-    try { ids.push((await assets.upload(await shrink(f))).id); }
-    catch (e) { failed++; }
+    try {
+      const id = (await assets.upload(await shrink(f))).id;
+      // Append to the current list each time, so a parallel batch or a deletion isn't overwritten.
+      await saveProfile({ photos: [...(profile.photos || []), id] });
+    } catch (e) { failed++; }
   }
-  await saveProfile({ photos: ids });
-  say("#youStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `${ids.length} photos of you saved.`, failed ? "err" : "ok");
+  say("#youStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `${(profile.photos || []).length} photos of you saved.`, failed ? "err" : "ok");
 }
 
 const STYLE_PROMPT = `These are photos of me from different angles. Act as a frank, experienced personal stylist.
@@ -288,14 +291,21 @@ async function addItems(files) {
       blob = await shrink(f);
       const up = await assets.upload(blob);
       ref = col.doc("item-" + up.id);
+      tagging.add(ref.id); // before the write, so the snapshot never mistakes it for an interrupted upload
       await ref.set({ asset: up.id, name: "Tagging…", cat: "other", added: Date.now() });
-    } catch (e) { failed++; continue; }
-    if (!sample) { await ref.update({ name: "Untitled item" }); continue; }
-    try { await ref.update(cleanTag(await sample.json(TAG_PROMPT, { images: [blob], modelTier: "quick" }))); }
+    } catch (e) { failed++; if (ref) tagging.delete(ref.id); continue; }
+    // Save the tag onto the item as it is now: skip it if it was removed meanwhile, keep a name the user typed.
+    const finish = async patch => {
+      const cur = items.find(x => x.id === ref.id);
+      if (cur) await ref.update(cur.name !== "Tagging…" ? { ...patch, name: cur.name } : patch).catch(() => {});
+    };
+    if (!sample) { await finish({ name: "Untitled item" }); tagging.delete(ref.id); continue; }
+    try { await finish(cleanTag(await sample.json(TAG_PROMPT, { images: [blob], modelTier: "quick" }))); }
     catch (e) {
-      await ref.update({ name: "Untitled item" });
+      await finish({ name: "Untitled item" });
       if (["not_granted", "rate_limited", "sampling_disabled"].includes(e?.code)) say("#closetStatus", errCopy(e), "err");
     }
+    tagging.delete(ref.id);
   }
   say("#closetStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `Added ${files.length}. Check the names and fix any that are off.`, failed ? "err" : "ok");
 }
@@ -578,7 +588,8 @@ render();
       if (d.id === "profile") profile = { ...v };
       else if (d.id === "plan") plan = v;
       else if (d.id === "today") today = v;
-      else if (d.id.startsWith("item-")) items.push({ id: d.id, ...v });
+      // "Tagging…" with no upload running here means an interrupted upload: show it as usable.
+      else if (d.id.startsWith("item-")) items.push({ id: d.id, ...v, ...(v.name === "Tagging…" && !tagging.has(d.id) && { name: "Untitled item" }) });
     }
     render();
   }, e => { clearTimeout(t); banner(`Your wardrobe couldn't load (${e.code}). Reload the page.`); });
