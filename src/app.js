@@ -58,13 +58,16 @@ const about = () => $("#about").value.trim() || "(no profile yet)";
 
 /* ---------- 1. You ---------- */
 async function addSelf(files) {
-  const ids = [...(S.profile.photos || [])]; let failed = 0;
+  let failed = 0;
   for (const [i, f] of files.entries()) {
     say("#youStatus", `Saving ${i + 1} of ${files.length}…`);
-    try { ids.push(await store.putPhoto(await shrink(f))); } catch { failed++; }
+    try {
+      const id = await store.putPhoto(await shrink(f));
+      // Append to the current list each time, so a parallel batch or a deletion isn't overwritten.
+      await saveProfile({ photos: [...(S.profile.photos || []), id] });
+    } catch { failed++; }
   }
-  await saveProfile({ photos: ids });
-  say("#youStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `${ids.length} photos of you saved.`, failed ? "err" : "ok");
+  say("#youStatus", failed ? `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.` : `${(S.profile.photos || []).length} photos of you saved.`, failed ? "err" : "ok");
 }
 
 async function readStyle() {
@@ -93,8 +96,13 @@ async function addItems(files) {
       item = { id: "item-" + photo, photo, name: "Tagging…", cat: "other", added: Date.now() };
       await saveItem(item);
     } catch { failed++; continue; }
-    try { await saveItem({ ...item, ...cleanTag(await askJson(TAG_PROMPT, { images: [blob], fast: true })) }); }
-    catch (e) { tagErr = e; await saveItem({ ...item, name: "Untitled item" }); }
+    // Save the tag onto the item as it is now: skip it if it was removed meanwhile, keep a name the user typed.
+    const finish = patch => {
+      const cur = S.items.find(x => x.id === item.id);
+      return cur && saveItem({ ...cur, ...patch, ...(cur.name !== "Tagging…" && { name: cur.name }) });
+    };
+    try { await finish(cleanTag(await askJson(TAG_PROMPT, { images: [blob], fast: true }))); }
+    catch (e) { tagErr = e; await finish({ name: "Untitled item" }); }
   }
   if (failed) say("#closetStatus", `${failed} photo(s) couldn't be read. iPhone HEIC photos need exporting as JPEG.`, "err");
   else if (tagErr) say("#closetStatus", `Saved, but auto-tagging failed: ${errCopy(tagErr)} Name the items yourself.`, "err");
@@ -299,7 +307,9 @@ document.addEventListener("click", async e => {
   try {
     const docs = await store.getAllDocs();
     S.profile = docs.profile || {}; S.today = docs.today || null; S.plan = docs.plan || null;
-    S.items = Object.entries(docs).filter(([k]) => k.startsWith("item-")).map(([, v]) => v);
+    // An item still "Tagging…" at load time was interrupted (tab closed mid-upload); make it usable.
+    S.items = Object.entries(docs).filter(([k]) => k.startsWith("item-"))
+      .map(([, v]) => (v.name === "Tagging…" ? { ...v, name: "Untitled item" } : v));
     if (S.plan?.trip) for (const k of ["where", "length", "weather", "plans", "bag"]) if (S.plan.trip[k]) $("#" + k).value = S.plan.trip[k];
     await store.loadPhotoUrls([...(S.profile.photos || []), ...S.items.map(i => i.photo)]);
     store.persist();
